@@ -1,0 +1,10 @@
+CustomerId,UserId,FullName,Address1,Zip,State,Phone,Email
+100,4,Howard Roark,14 Main St,95112,OR,650 555 5555,H@roark.net
+101,5,John Galt,200 1st st,33838,ID,303-111-2121,J2@galt.ca
+102,4,Mr. Smith,10 A st,95051,CA,555-666-7777,J@smith.com
+103,1,Jill Doe,55 B ave,94203,PA,949-191-2121,ABC@G.com
+104,2,Pam A,303 oak ave,92121,AZ,801-311-2911,John@gmail.com 
+105,3,Dagny,129 crest ave,97272,AL,343-232-2323,x@gmail.com
+106,1,Mr. Taggart,534 main ave,75829,AK,343-534-3453,y@hotmail.com
+107,4,Eliot Benson,63453 oakcrest dr,23082,MA,756-232-4353,z@gmail.com
+108,4,Tony Blair,19 lilac way,43282,OR,333-114-1211,D@yahoo.com
