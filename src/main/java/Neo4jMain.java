@@ -21,34 +21,34 @@ public class Neo4jMain {
 
             session.run("USING PERIODIC COMMIT 1000\n" +
                     "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/users.csv\" AS csvLine\n" +
-                    "CREATE (n:User {UserId: csvLine.UserId, FullName: csvLine.FullName, Address: csvLine.Address1, Zip:csvLine.Zip, " +
+                    "MERGE (n:User {UserId: csvLine.UserId, FullName: csvLine.FullName, Address: csvLine.Address1, Zip:csvLine.Zip, " +
                     "State:csvLine.State, Phone:csvLine.Phone, Email:csvLine.Email})");
 ///Users/seema/IdeaProjects/Intuit/src/main/resources/
             session.run("USING PERIODIC COMMIT 1000\n" +
                     "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/products.csv\" AS csvLine\n" +
-                    "CREATE (n:Product { ProductId: csvLine.ProductId, ProductName: csvLine.Product})");
+                    "MERGE (n:Product { ProductId: csvLine.ProductId, ProductName: csvLine.Product})");
 
             session.run("USING PERIODIC COMMIT 1000\n" +
                     "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/customers.csv\" AS csvLine\n" +
-                    "CREATE (n:Customer {CustomerId:csvLine.CustomerId, UserId: csvLine.UserId, FullName: csvLine.FullName, Address:csvLine.Address1, " +
+                    "MERGE (n:Customer {CustomerId:csvLine.CustomerId, UserId: csvLine.UserId, FullName: csvLine.FullName, Address:csvLine.Address1, " +
                     "Zip:csvLine.Zip, State:csvLine.State, Phone:csvLine.Phone, Email:csvLine.Email})\n");
 
             session.run("USING PERIODIC COMMIT 1000\n" +
                     "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/userProduct.csv\" AS csvLine\n"+
                     "MATCH (a:User),(b:Product) "+
                     "WHERE a.UserId = csvLine.UserId AND b.ProductId = csvLine.ProductId "+
-                    "CREATE (a)-[r:uses]->(b) ");
+                    "MERGE (a)-[r:uses]->(b) ");
 
             session.run(
                     "MATCH (a:User),(b:Customer) "+
                             "WHERE a.UserId = b.UserId "+
-                            "CREATE (a)-[r:sellsTo]->(b)");
+                            "MERGE (a)-[r:sellsTo]->(b)");
 
             session.run(
                     "MATCH (n:Customer),(m:User) WHERE n.Zip=m.Zip AND n.State = m.State AND " +
                             "(n.Address=m.Address OR n.Email=m.Email ) "+
-                            "CREATE (m)-[r:sameAs]->(n) "+
-                            "CREATE (n)-[q:sameAs]->(m) ");
+                            "MERGE (m)-[r:sameAs]->(n) "+
+                            "MERGE (n)-[q:sameAs]->(m) ");
         }
     }
 
