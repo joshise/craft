@@ -1,58 +1,87 @@
 import com.google.gson.Gson;
 import org.neo4j.driver.v1.*;
 
-import java.io.File;
 import java.util.Scanner;
 import static org.neo4j.driver.v1.Values.parameters;
 
 public class Neo4jMain {
     //Using an local Neo4j instance
-    private static final Driver driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("thisisfors@gmail.com", "Passw0rd!"));
+    private static Driver driver;
 
-    private static void createNodesAndRelationships() {
+    public Neo4jMain(Driver dr){
+        driver = dr;
+    }
+
+    private String getLoadCsvStmt(String fileName){
+        String file = getClass().getClassLoader().getResource(fileName).getPath();
+        String periodicCommit = "USING PERIODIC COMMIT 1000\n";
+        return periodicCommit + "LOAD CSV WITH HEADERS FROM \"file:"+file+"\" AS csvLine \n";
+    }
+
+    protected void createUserNode(Session session){
+        session.run( getLoadCsvStmt("file/users.csv") +
+                "MERGE (n:User {UserId: csvLine.UserId, FullName: csvLine.FullName, Address: csvLine.Address1, Zip:csvLine.Zip, " +
+                "State:csvLine.State, Phone:csvLine.Phone, Email:csvLine.Email})");
+    }
+
+    protected void createProductNode(Session session){
+        session.run( getLoadCsvStmt("file/products.csv") +
+                "MERGE (n:Product { ProductId: csvLine.ProductId, ProductName: csvLine.Product})");
+    }
+
+    protected void createCustomerNode(Session session){
+        session.run( getLoadCsvStmt("file/customers.csv") +
+                "MERGE (n:Customer {CustomerId:csvLine.CustomerId, UserId: csvLine.UserId, FullName: csvLine.FullName, Address:csvLine.Address1, " +
+                "Zip:csvLine.Zip, State:csvLine.State, Phone:csvLine.Phone, Email:csvLine.Email})\n");
+    }
+
+    protected void createUserProductRel(Session session){
+        session.run( getLoadCsvStmt("file/userProduct.csv") +
+                "MATCH (a:User),(b:Product) "+
+                "WHERE a.UserId = csvLine.UserId AND b.ProductId = csvLine.ProductId "+
+                "MERGE (a)-[r:uses]->(b) ");
+    }
+
+    protected void createSellsToRel(Session session){
+        session.run( "MATCH (a:User),(b:Customer) "+
+                "WHERE a.UserId = b.UserId "+
+                "MERGE (a)-[r:sellsTo]->(b)");
+    }
+
+    protected void createSameAsRel(Session session) {
+        session.run( "MATCH (n:Customer),(m:User) WHERE n.Zip=m.Zip AND n.State = m.State AND " +
+                "(n.Address=m.Address OR n.Email=m.Email ) " +
+                "MERGE (m)-[r:sameAs]->(n) " +
+                "MERGE (n)-[q:sameAs]->(m) ");
+    }
+
+    protected void createConstraints(Session session){
+        session.run("CREATE CONSTRAINT ON (u:Product) ASSERT u.ProductId IS UNIQUE");
+        session.run("CREATE CONSTRAINT ON (u:User) ASSERT u.UserId IS UNIQUE");
+        session.run("CREATE CONSTRAINT ON (u:Customer) ASSERT u.CustomerId IS UNIQUE");
+        session.run("CREATE INDEX ON :User(FullName)");
+    }
+
+    protected void createNodes(Session session){
+        createConstraints(session);
+        createUserNode(session);
+        createProductNode(session);
+        createCustomerNode(session);
+    }
+
+    protected void createNodesAndRelationships() {
         // Driver objects are thread-safe and are typically made available application-wide.
         //Assumption: Data from hive comes in csv format
         try (Session session = driver.session()) {
             //Auto-commit transactions are the only way to execute USING PERIODIC COMMIT Cypher statements.
-            session.run("CREATE CONSTRAINT ON (u:Product) ASSERT u.ProductId IS UNIQUE");
-            session.run("CREATE CONSTRAINT ON (u:User) ASSERT u.UserId IS UNIQUE");
-            session.run("CREATE CONSTRAINT ON (u:Customer) ASSERT u.CustomerId IS UNIQUE");
-            session.run("CREATE INDEX ON :User(FullName)");
-
-            session.run("USING PERIODIC COMMIT 1000\n" +
-                    "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/users.csv\" AS csvLine\n" +
-                    "MERGE (n:User {UserId: csvLine.UserId, FullName: csvLine.FullName, Address: csvLine.Address1, Zip:csvLine.Zip, " +
-                    "State:csvLine.State, Phone:csvLine.Phone, Email:csvLine.Email})");
-///Users/seema/IdeaProjects/Intuit/src/main/resources/
-            session.run("USING PERIODIC COMMIT 1000\n" +
-                    "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/products.csv\" AS csvLine\n" +
-                    "MERGE (n:Product { ProductId: csvLine.ProductId, ProductName: csvLine.Product})");
-
-            session.run("USING PERIODIC COMMIT 1000\n" +
-                    "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/customers.csv\" AS csvLine\n" +
-                    "MERGE (n:Customer {CustomerId:csvLine.CustomerId, UserId: csvLine.UserId, FullName: csvLine.FullName, Address:csvLine.Address1, " +
-                    "Zip:csvLine.Zip, State:csvLine.State, Phone:csvLine.Phone, Email:csvLine.Email})\n");
-
-            session.run("USING PERIODIC COMMIT 1000\n" +
-                    "LOAD CSV WITH HEADERS FROM \"file:///Users/seema/IdeaProjects/Intuit/src/main/resources/userProduct.csv\" AS csvLine\n"+
-                    "MATCH (a:User),(b:Product) "+
-                    "WHERE a.UserId = csvLine.UserId AND b.ProductId = csvLine.ProductId "+
-                    "MERGE (a)-[r:uses]->(b) ");
-
-            session.run(
-                    "MATCH (a:User),(b:Customer) "+
-                            "WHERE a.UserId = b.UserId "+
-                            "MERGE (a)-[r:sellsTo]->(b)");
-
-            session.run(
-                    "MATCH (n:Customer),(m:User) WHERE n.Zip=m.Zip AND n.State = m.State AND " +
-                            "(n.Address=m.Address OR n.Email=m.Email ) "+
-                            "MERGE (m)-[r:sameAs]->(n) "+
-                            "MERGE (n)-[q:sameAs]->(m) ");
+            createNodes(session);
+            createUserProductRel(session);
+            createSellsToRel(session);
+            createSameAsRel(session);
         }
     }
 
-    private static void cleanDB(){
+    protected void cleanDB(){
         try (Session session = driver.session()) {
             session.run("MATCH (n)\n" +
                     "WITH n LIMIT 10000\n" +
@@ -61,17 +90,19 @@ public class Neo4jMain {
         }
     }
 
-    private static String printSubGraph(String name){
+    protected String getSubGraph(String name){
         Session session = driver.session();
         Gson gson = new Gson();
         StringBuffer sb= new StringBuffer();
-        //Using this for most of uses, sellsTo and sameAs
+        //Using this for uses, sellsTo and sameAs
         StatementResult result = session.run("MATCH (n:User) WHERE n.FullName=$fullName "+
                 "MATCH (n)-[r]->(m)"+
                 "RETURN type(r),m", parameters( "fullName", name ) );
-        while ( result.hasNext() ) {
+        if (result.hasNext() == false){
+            return "User "+name+" does not exist in the graph";
+        }
+        while (result.hasNext() ) {
             Record record = result.next();
-            record.asMap();
             sb.append(gson.toJson(record.asMap())).append("\n");
         }
         result = session.run(//User to user
@@ -80,7 +111,6 @@ public class Neo4jMain {
                  "return $type, m", parameters( "fullName", name , "type", "isCustomerOf"));
         while ( result.hasNext() ) {
             Record record = result.next();
-            record.asMap();
             sb.append(gson.toJson(record.asMap())).append("\n");
         }
         session.close();
@@ -88,8 +118,10 @@ public class Neo4jMain {
     }
 
     public static void main(String[] args) {
-        cleanDB();
-        createNodesAndRelationships();
+        Driver driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("thisisfors@gmail.com", "Passw0rd!"));
+        Neo4jMain neo = new Neo4jMain(driver);
+        neo.cleanDB();
+        neo.createNodesAndRelationships();
 
         Scanner scanner=new Scanner(System.in);
         while (true) {
@@ -98,7 +130,7 @@ public class Neo4jMain {
             if(name.equals("exit")){
                 break;
             }
-            String result = printSubGraph(name);
+            String result = neo.getSubGraph(name);
             System.out.println(result);
         }
         scanner.close();
